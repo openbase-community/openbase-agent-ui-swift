@@ -11,9 +11,12 @@ Add the package with Swift Package Manager:
 ```swift
 .package(
     url: "https://github.com/openbase-community/openbase-agent-ui-swift.git",
-    branch: "main"
+    from: "0.1.0"
 )
 ```
+
+Releases are tagged from the `main` branch; `0.1.0` is the first published
+revision.
 
 Then depend on the library product:
 
