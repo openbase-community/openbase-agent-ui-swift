@@ -40,7 +40,7 @@ OpenbaseAgentUI.configure(
 )
 ```
 
-`CallTokenProvider` can optionally prepare a backend before returning a room token. The default implementation does no preparation, so simple integrations only need to implement `fetchRoomToken`.
+`CallTokenProvider` can optionally prepare a backend before returning a room token. The default implementation does no preparation, so simple integrations only need to implement `fetchRoomToken`. A call can be started inside a conversation: implement the `targetThread:` variants (`CallTargetThread`, a thread id plus the label the app shows) to pass that thread to the runtime; the defaults ignore the target, so a target-less implementation still works as a dispatcher-only provider.
 
 ## Boundary
 

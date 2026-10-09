@@ -18,12 +18,38 @@ public enum CallPreparationState: Sendable, Equatable {
     public var isPreparing: Bool { self != .idle }
 }
 
+/// The conversation a call is started from. A call started from a thread
+/// talks to that thread from its first word; a call started with no target
+/// talks to the dispatcher.
+public struct CallTargetThread: Sendable, Equatable {
+    public let threadId: String
+    /// The name the app shows for the thread, spoken when it cannot be
+    /// reached. Optional: the runtime derives one otherwise.
+    public let label: String?
+
+    public init(threadId: String, label: String? = nil) {
+        self.threadId = threadId
+        let trimmed = label?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        self.label = trimmed.isEmpty ? nil : trimmed
+    }
+}
+
 /// Mints session credentials and, when necessary, prepares the backing agent
 /// runtime before a call connects.
+///
+/// Implement the `targetThread:` variants to start calls inside a thread; the
+/// defaults forward to the target-less methods, so an implementation of the
+/// original two methods still satisfies the protocol (dispatcher calls only).
 public protocol CallTokenProvider: Sendable {
     func fetchRoomToken(
         roomName: String,
         livekitDispatchAgentName: String
+    ) async throws -> String
+
+    func fetchRoomToken(
+        roomName: String,
+        livekitDispatchAgentName: String,
+        targetThread: CallTargetThread?
     ) async throws -> String
 
     func shouldPrepareRoomToken() async -> Bool
@@ -33,9 +59,24 @@ public protocol CallTokenProvider: Sendable {
         livekitDispatchAgentName: String,
         onProgress: @escaping @Sendable (CallPreparationState) -> Void
     ) async throws -> PreparedCallToken?
+
+    func prepareRoomTokenIfNeeded(
+        roomName: String,
+        livekitDispatchAgentName: String,
+        targetThread: CallTargetThread?,
+        onProgress: @escaping @Sendable (CallPreparationState) -> Void
+    ) async throws -> PreparedCallToken?
 }
 
 public extension CallTokenProvider {
+    func fetchRoomToken(
+        roomName: String,
+        livekitDispatchAgentName: String,
+        targetThread _: CallTargetThread?
+    ) async throws -> String {
+        try await fetchRoomToken(roomName: roomName, livekitDispatchAgentName: livekitDispatchAgentName)
+    }
+
     func shouldPrepareRoomToken() async -> Bool { false }
 
     func prepareRoomTokenIfNeeded(
@@ -44,6 +85,19 @@ public extension CallTokenProvider {
         onProgress _: @escaping @Sendable (CallPreparationState) -> Void
     ) async throws -> PreparedCallToken? {
         nil
+    }
+
+    func prepareRoomTokenIfNeeded(
+        roomName: String,
+        livekitDispatchAgentName: String,
+        targetThread _: CallTargetThread?,
+        onProgress: @escaping @Sendable (CallPreparationState) -> Void
+    ) async throws -> PreparedCallToken? {
+        try await prepareRoomTokenIfNeeded(
+            roomName: roomName,
+            livekitDispatchAgentName: livekitDispatchAgentName,
+            onProgress: onProgress
+        )
     }
 }
 

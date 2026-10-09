@@ -63,6 +63,39 @@ struct OpenbaseAgentUITests {
     }
 
     @Test
+    func callTargetDefaultsForwardToTargetlessProvider() async throws {
+        // An implementation of the original two methods keeps compiling and
+        // behaves as a dispatcher-only provider.
+        let provider = TestCallTokenProvider()
+        let target = CallTargetThread(threadId: "s_1", label: "  Hi are you there?  ")
+        #expect(target.label == "Hi are you there?")
+        #expect(CallTargetThread(threadId: "s_1", label: "   ").label == nil)
+        #expect(try await provider.fetchRoomToken(
+            roomName: "room",
+            livekitDispatchAgentName: "dispatcher",
+            targetThread: target
+        ) == "room-token")
+        #expect(try await provider.prepareRoomTokenIfNeeded(
+            roomName: "room",
+            livekitDispatchAgentName: "dispatcher",
+            targetThread: target,
+            onProgress: { _ in }
+        ) == nil)
+    }
+
+    @Test
+    func callTargetReachesAProviderThatImplementsIt() async throws {
+        let provider = TargetAwareCallTokenProvider()
+        let token = try await provider.fetchRoomToken(
+            roomName: "room",
+            livekitDispatchAgentName: "dispatcher",
+            targetThread: CallTargetThread(threadId: "s_1", label: "Thread")
+        )
+        #expect(token == "room-token:s_1:Thread")
+        #expect(try await provider.fetchRoomToken(roomName: "room", livekitDispatchAgentName: "dispatcher") == "room-token")
+    }
+
+    @Test
     func sessionStateSemanticsRemainStable() {
         #expect(CallState.connected.isActive)
         #expect(CallState.activeIncoming.isActive)
@@ -102,6 +135,21 @@ private struct TestCallTokenProvider: CallTokenProvider {
         livekitDispatchAgentName _: String
     ) async throws -> String {
         "room-token"
+    }
+}
+
+private struct TargetAwareCallTokenProvider: CallTokenProvider {
+    func fetchRoomToken(roomName: String, livekitDispatchAgentName: String) async throws -> String {
+        try await fetchRoomToken(roomName: roomName, livekitDispatchAgentName: livekitDispatchAgentName, targetThread: nil)
+    }
+
+    func fetchRoomToken(
+        roomName _: String,
+        livekitDispatchAgentName _: String,
+        targetThread: CallTargetThread?
+    ) async throws -> String {
+        guard let targetThread else { return "room-token" }
+        return "room-token:\(targetThread.threadId):\(targetThread.label ?? "")"
     }
 }
 
